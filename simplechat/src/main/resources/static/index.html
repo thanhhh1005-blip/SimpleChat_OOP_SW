@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Chat</title>
+    <!-- 1. NHÚNG THƯ VIỆN CẦN THIẾT -->
+    <!-- SockJS: Giúp tạo kết nối socket giả lập nếu trình duyệt không hỗ trợ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <!-- Stomp: Giúp đóng gói tin nhắn theo quy chuẩn để Java hiểu được -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+    <h2>Phòng Chat Demo</h2>
+
+    <!-- Phần nhập tên -->
+    <div id="username-page">
+        <input type="text" id="name" placeholder="Nhập tên bạn..." />
+        <button onclick="connect()">Vào phòng</button>
+    </div>
+
+    <!-- Phần chat (Hiện ra sau khi kết nối) -->
+    <div id="chat-page" style="display:none;">
+        <ul id="messageArea"></ul>
+        <input type="text" id="message" placeholder="Nhập tin nhắn..." />
+        <button onclick="sendMessage()">Gửi</button>
+    </div>
+
+    <script>
+        var stompClient = null;
+        var username = null;
+
+        // --- HÀM 1: KẾT NỐI SERVER ---
+        function connect() {
+            username = document.getElementById('name').value;
+            if(username) {
+                // [MÓC NỐI 1]: Kết nối vào cổng "/ws"
+                var socket = new SockJS('/ws'); 
+                stompClient = Stomp.over(socket);
+
+                stompClient.connect({}, function (frame) {
+                    console.log('Đã kết nối: ' + frame);
+                    
+                    // Hiện khung chat, ẩn khung nhập tên
+                    document.getElementById('username-page').style.display = 'none';
+                    document.getElementById('chat-page').style.display = 'block';
+
+                    // [MÓC NỐI 2]: Đăng ký nghe tin từ "/topic/public"
+                    stompClient.subscribe('/topic/public', function (payload) {
+                        var message = JSON.parse(payload.body);
+                        showMessage(message);
+                    });
+
+                    // Gửi tin nhắn báo danh (JOIN)
+                    stompClient.send("/app/chat.addUser", {}, JSON.stringify({sender: username, type: 'JOIN'}));
+                });
+            }
+        }
+
+        // --- HÀM 2: GỬI TIN NHẮN ---
+        function sendMessage() {
+            var messageContent = document.getElementById('message').value;
+            if(messageContent && stompClient) {
+                var chatMessage = {
+                    sender: username,
+                    content: messageContent,
+                    type: 'CHAT'
+                };
+                
+                // [MÓC NỐI 3]: Gửi tin lên địa chỉ "/app/chat.sendMessage"
+                stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
+                document.getElementById('message').value = '';
+            }
+        }
+
+        // --- HÀM 3: HIỂN THỊ TIN NHẮN RA MÀN HÌNH ---
+        function showMessage(message) {
+            var messageArea = document.getElementById('messageArea');
+            var li = document.createElement('li');
+            li.appendChild(document.createTextNode(message.sender + ": " + message.content));
+            messageArea.appendChild(li);
+        }
+    </script>
+</body>
+</html>
