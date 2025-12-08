@@ -1,84 +1,207 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <title>Simple Chat</title>
-    <!-- 1. NHÚNG THƯ VIỆN CẦN THIẾT -->
-    <!-- SockJS: Giúp tạo kết nối socket giả lập nếu trình duyệt không hỗ trợ -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
-    <!-- Stomp: Giúp đóng gói tin nhắn theo quy chuẩn để Java hiểu được -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
-</head>
-<body>
-    <h2>Phòng Chat Demo</h2>
 
-    <!-- Phần nhập tên -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+    <style>
+        body {
+            font-family: Poppins, Arial;
+            background: #1c1f22;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: white;
+            margin: 0;
+        }
+
+        .chat-container {
+            width: 420px;
+            background: #2b2f33;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
+        }
+
+        .title {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        #messageArea {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px;
+            height: 420px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+
+        #messageArea::-webkit-scrollbar {
+            width: 6px;
+        }
+        #messageArea::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 10px;
+        }
+        #messageArea::-webkit-scrollbar-track {
+            background: #2b2f33;
+        }
+
+        #messageArea li {
+            list-style: none;
+            max-width: 70%;
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 15px;
+            line-height: 1.35;
+            word-wrap: break-word;
+            word-break: break-word;
+        }
+
+        .my-message {
+            background: #006eff;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .other-message {
+            background: #444a50;
+            color: #fff;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .join, .leave {
+            text-align: center;
+            font-size: 13px;
+            width: 100%;
+            font-style: italic;
+            opacity: 0.85;
+            margin: 4px 0;
+        }
+
+        .join { color: #28c76f; }
+        .leave { color: #ff9f43; }
+
+        .input-row {
+            display: flex;
+            margin-top: 10px;
+        }
+        input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            outline: none;
+            background: #3b4047;
+            color: white;
+            font-size: 14px;
+        }
+        button {
+            margin-left: 8px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            background: #006eff;
+            border: none;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #007bff;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="chat-container">
+
+    <div class="title">Simple Chat 💬</div>
+
     <div id="username-page">
-        <input type="text" id="name" placeholder="Nhập tên bạn..." />
+        <input type="text" id="name" placeholder="Nhập tên bạn...">
         <button onclick="connect()">Vào phòng</button>
     </div>
 
-    <!-- Phần chat (Hiện ra sau khi kết nối) -->
     <div id="chat-page" style="display:none;">
         <ul id="messageArea"></ul>
-        <input type="text" id="message" placeholder="Nhập tin nhắn..." />
-        <button onclick="sendMessage()">Gửi</button>
+
+        <div class="input-row">
+            <input type="text" id="message" placeholder="Nhập nội dung..." 
+                onkeypress="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()">Gửi</button>
+        </div>
     </div>
+</div>
 
-    <script>
-        var stompClient = null;
-        var username = null;
 
-        // --- HÀM 1: KẾT NỐI SERVER ---
-        function connect() {
-            username = document.getElementById('name').value;
-            if(username) {
-                // [MÓC NỐI 1]: Kết nối vào cổng "/ws"
-                var socket = new SockJS('/ws'); 
-                stompClient = Stomp.over(socket);
+<script>
+    var stompClient = null;
+    var username = null;
 
-                stompClient.connect({}, function (frame) {
-                    console.log('Đã kết nối: ' + frame);
-                    
-                    // Hiện khung chat, ẩn khung nhập tên
-                    document.getElementById('username-page').style.display = 'none';
-                    document.getElementById('chat-page').style.display = 'block';
+    function connect() {
+        username = document.getElementById("name").value.trim();
+        if (!username) return;
 
-                    // [MÓC NỐI 2]: Đăng ký nghe tin từ "/topic/public"
-                    stompClient.subscribe('/topic/public', function (payload) {
-                        var message = JSON.parse(payload.body);
-                        showMessage(message);
-                    });
+        var socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
 
-                    // Gửi tin nhắn báo danh (JOIN)
-                    stompClient.send("/app/chat.addUser", {}, JSON.stringify({sender: username, type: 'JOIN'}));
-                });
-            }
+        stompClient.connect({}, function () {
+            document.getElementById("username-page").style.display="none";
+            document.getElementById("chat-page").style.display="block";
+
+            stompClient.subscribe("/topic/public",
+                (payload)=> showMessage(JSON.parse(payload.body))
+            );
+
+            stompClient.send("/app/chat.addUser", {}, 
+                JSON.stringify({ sender: username, type: "JOIN" })
+            );
+        });
+    }
+
+    function sendMessage() {
+        var msg = document.getElementById("message").value.trim();
+        if(msg === "") return;
+
+        stompClient.send("/app/chat.sendMessage", {}, 
+            JSON.stringify({ sender: username, content: msg, type: "CHAT" })
+        );
+        document.getElementById("message").value = "";
+    }
+
+    function showMessage(message) {
+        var area = document.getElementById("messageArea");
+        var li = document.createElement("li");
+
+        if(message.type === "JOIN") {
+            li.className="join";
+            li.textContent = message.sender + " đã tham gia";
+        }
+        else if(message.type === "LEAVE") {
+            li.className="leave";
+            li.textContent = message.sender + " đã rời phòng";
+        }
+        else {
+            li.className = (message.sender === username) ? "my-message" : "other-message";
+            li.innerHTML = `<strong>${message.sender}</strong><br>${message.content}`;
         }
 
-        // --- HÀM 2: GỬI TIN NHẮN ---
-        function sendMessage() {
-            var messageContent = document.getElementById('message').value;
-            if(messageContent && stompClient) {
-                var chatMessage = {
-                    sender: username,
-                    content: messageContent,
-                    type: 'CHAT'
-                };
-                
-                // [MÓC NỐI 3]: Gửi tin lên địa chỉ "/app/chat.sendMessage"
-                stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
-                document.getElementById('message').value = '';
-            }
-        }
+        area.appendChild(li);
+        area.scrollTop = area.scrollHeight;
+    }
+</script>
 
-        // --- HÀM 3: HIỂN THỊ TIN NHẮN RA MÀN HÌNH ---
-        function showMessage(message) {
-            var messageArea = document.getElementById('messageArea');
-            var li = document.createElement('li');
-            li.appendChild(document.createTextNode(message.sender + ": " + message.content));
-            messageArea.appendChild(li);
-        }
-    </script>
 </body>
+
 </html>
