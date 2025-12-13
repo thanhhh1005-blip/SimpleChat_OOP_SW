@@ -1,23 +1,26 @@
 package com.oopsw.simplechat.model;
 
+import jakarta.persistence.*;
+import lombok.Data;
+
+
+@Entity // 1. Báo hiệu: Class này tương ứng với 1 bảng trong SQL
+@Table(name = "chat_messages") // Đặt tên bảng là "chat_messages"
+@Data
 public class ChatMessage {
-  private String content;
-  private String sender;
-  private MessageType type;
 
-  public enum MessageType{
-    CHAT,
-    JOIN,
-    LEAVE
-  }
+    @Id // 2. Khóa chính (Primary Key)
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // Tự động tăng (1, 2, 3...)
+    private Long id;
 
-  public String getContent(){return content;}
-  public void setContent(String content){this.content = content;}
+    private String content;
+    private String sender;
 
-  public String getSender(){return sender;}
-  public void setSender(String sender){this.sender = sender;}
-
-  public MessageType getType(){return type;}
-  public void setType(MessageType type){this.type = type;}
-
+    @Enumerated(EnumType.STRING) // 3. Lưu Enum dưới dạng chữ ("CHAT", "JOIN") thay vì số
+    private MessageType type;
+    
+    // Enum giữ nguyên
+    public enum MessageType {
+        CHAT, JOIN, LEAVE
+    }
 }
