@@ -1,12 +1,15 @@
-# 1. Dùng nền tảng Java 17 (hoặc 21 tùy máy em, nhưng 17 là chuẩn nhất)
+# --- GIAI ĐOẠN 1: Builder ---
+# Giữ nguyên maven:3.9, chỉ sửa số 17 thành 21
+FROM maven:3.9-eclipse-temurin-21-alpine AS builder
+
+WORKDIR /app
+COPY . .
+RUN mvn clean install -DskipTests
+
+# --- GIAI ĐOẠN 2: Runner ---
+# Sửa số 17 thành 21
 FROM eclipse-temurin:21-jdk-alpine
 
-# 2. Tạo vùng chứa tạm
 VOLUME /tmp
-
-# 3. Copy file .jar đã build xong vào trong Docker
-# Lưu ý: Lệnh này sẽ tìm bất kỳ file .jar nào trong folder target
-COPY target/*.jar app.jar
-
-# 4. Chạy ứng dụng
+COPY --from=builder /app/target/*.jar app.jar
 ENTRYPOINT ["java","-jar","/app.jar"]
